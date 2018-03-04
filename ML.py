@@ -7,10 +7,12 @@ from sklearn.tree import DecisionTreeClassifier
 from datetime import datetime
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import cmudict
-from sklearn.metrics import precision_score, recall_score
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 from sklearn import svm
+from sklearn.neural_network import MLPClassifier
+import pickle
 
-number_of_posts = 1000
+number_of_posts = 100
 print('number of posts ', number_of_posts)
 
 prondict = cmudict.dict()
@@ -76,6 +78,7 @@ class Question:
         self.answered = 0
         self.asker_satisfaction = 0
         self.AcceptedAnswerId = AcceptedAnswerId
+        self.AcceptedAnswerDuration = -1
         # if AnswerCount and int(AnswerCount) > 0:
         #   self.answered = 1
         if AcceptedAnswerId:
@@ -83,15 +86,15 @@ class Question:
 
     def set_feature(self):
         self.title_length = len(self.Title)
-        self.post_length = self.Body
-        if self.Id != '40004818' and self.Id != '40037764' and self.Id != '7980583' and self.Id != '7980751':
-            while '<code>' in self.post_length:
-                index_code = self.post_length.index('<code>')
-                index_end_code = self.post_length.index('</code>')
-                self.post_length = self.post_length[:index_code] + self.post_length[index_end_code + 7:]
+        self.post_length = len(self.Body)
+        # if self.Id != '40004818' and self.Id != '40037764' and self.Id != '7980583' and self.Id != '7980751':
+        #     while '<code>' in self.post_length:
+        #         index_code = self.post_length.index('<code>')
+        #         index_end_code = self.post_length.index('</code>')
+        #         self.post_length = self.post_length[:index_code] + self.post_length[index_end_code + 7:]
 
-            self.readability = flesch(self.post_length)
-            self.post_length = len(self.post_length)
+        self.readability = flesch(self.Body)
+            # self.post_length = len(self.post_length)
 
         tag_similarity = {}
         for tag in self.Tags:
@@ -112,6 +115,8 @@ class Question:
                 self.question_asked += 1
 
         for a in Answer.all_Answers:
+            if self.AcceptedAnswerId == a.Id:
+                self.AcceptedAnswerDuration = a.CreationDate - self.CreationDate
             if a != self and a.CreationDate < self.CreationDate and self.OwnerUserId == a.OwnerUserId:
                 self.question_answered += 1
         self.asker_score = 0
@@ -175,6 +180,91 @@ class Karbar:
     @staticmethod
     def addUser(User):
         User.all_Users.append(User)
+
+
+def random_forest(A, v, A_test, v4, label_test, label_test_4class):
+    clf = RandomForestClassifier(max_depth=4, random_state=0)
+    clf.fit(A, v)
+    predicted = clf.predict(A_test)
+    data = {}
+    data['2class'] = {}
+    data['2class']['precision'] = precision_score(label_test, predicted, average='macro')
+    data['2class']['recall'] = recall_score(label_test, predicted, average='macro')
+    data['2class']['accuracy'] = accuracy_score(label_test, predicted)
+    data['2class']['f1'] = f1_score(label_test, predicted, average='macro')
+    clf.fit(A, v4)
+    predicted = clf.predict(A_test)
+    data['4class'] = {}
+    data['4class']['precision'] = precision_score(label_test_4class, predicted, average='macro')
+    data['4class']['recall'] = recall_score(label_test_4class, predicted, average='macro')
+    data['4class']['accuracy'] = accuracy_score(label_test_4class, predicted)
+    data['4class']['f1'] = f1_score(label_test_4class, predicted, average='macro')
+    with open('random_forest', 'wb') as outfile:
+        pickle.dump(data, outfile)
+
+
+def decision_tree(A, v, A_test, v4, label_test, label_test_4class):
+    clf = DecisionTreeClassifier(max_depth=4, random_state=0)
+    clf.fit(A, v)
+    predicted = clf.predict(A_test)
+    data = {}
+    data['2class'] = {}
+    data['2class']['precision'] = precision_score(label_test, predicted, average='macro')
+    data['2class']['recall'] = recall_score(label_test, predicted, average='macro')
+    data['2class']['accuracy'] = accuracy_score(label_test, predicted)
+    data['2class']['f1'] = f1_score(label_test, predicted, average='macro')
+    clf.fit(A, v4)
+    predicted = clf.predict(A_test)
+    data['4class'] = {}
+    data['4class']['precision'] = precision_score(label_test_4class, predicted, average='macro')
+    data['4class']['recall'] = recall_score(label_test_4class, predicted, average='macro')
+    data['4class']['accuracy'] = accuracy_score(label_test_4class, predicted)
+    data['4class']['f1'] = f1_score(label_test_4class, predicted, average='macro')
+    favorite_color = {"lion": "yellow", "kitty": "red"}
+    with open('decision_tree', 'wb') as outfile:
+        pickle.dump(data, outfile)
+
+
+def svm_linear(A, v, A_test, v4, label_test, label_test_4class):
+    clf = svm.LinearSVC(C=1.25)
+    clf.fit(A, v)
+    predicted = clf.predict(A_test)
+    data = {}
+    data['2class'] = {}
+    data['2class']['precision'] = precision_score(label_test, predicted, average='macro')
+    data['2class']['recall'] = recall_score(label_test, predicted, average='macro')
+    data['2class']['accuracy'] = accuracy_score(label_test, predicted)
+    data['2class']['f1'] = f1_score(label_test, predicted, average='macro')
+    clf.fit(A, v4)
+    predicted = clf.predict(A_test)
+    data['4class'] = {}
+    data['4class']['precision'] = precision_score(label_test_4class, predicted, average='macro')
+    data['4class']['recall'] = recall_score(label_test_4class, predicted, average='macro')
+    data['4class']['accuracy'] = accuracy_score(label_test_4class, predicted)
+    data['4class']['f1'] = f1_score(label_test_4class, predicted, average='macro')
+    with open('svm_linear', 'wb') as outfile:
+        pickle.dump(data, outfile)
+
+
+def neural_network(A, v, A_test, v4, label_test, label_test_4class):
+    clf = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(5, 2), random_state=1)
+    clf.fit(A, v)
+    predicted = clf.predict(A_test)
+    data = {}
+    data['2class'] = {}
+    data['2class']['precision'] = precision_score(label_test, predicted, average='macro')
+    data['2class']['recall'] = recall_score(label_test, predicted, average='macro')
+    data['2class']['accuracy'] = accuracy_score(label_test, predicted)
+    data['2class']['f1'] = f1_score(label_test, predicted, average='macro')
+    clf.fit(A, v4)
+    predicted = clf.predict(A_test)
+    data['4class'] = {}
+    data['4class']['precision'] = precision_score(label_test_4class, predicted, average='macro')
+    data['4class']['recall'] = recall_score(label_test_4class, predicted, average='macro')
+    data['4class']['accuracy'] = accuracy_score(label_test_4class, predicted)
+    data['4class']['f1'] = f1_score(label_test_4class, predicted, average='macro')
+    with open('neural_network', 'wb') as outfile:
+        pickle.dump(data, outfile)
 
 
 with open('QueryResults.csv', 'rt') as file:
@@ -250,27 +340,19 @@ for q in Question.all_Questions[int(len(Question.all_Questions) * 0.8):]:
 A = csr_matrix(matrix_list)
 v = np.array(label)
 A_test = csr_matrix(matrix_list_test)
+v4 = np.array(label_4class)
 
-section = int(input('which algorithm?'))
-if section == 1:
-    clf = RandomForestClassifier(max_depth=4, random_state=0)
-    print('random forest')
-if section == 2:
-    clf = DecisionTreeClassifier(max_depth=4, random_state=0)
-    print('decision tree')
-else:
-    clf = svm.SVC()
-    print('svm')
+random_forest(A, v, A_test, v4, label_test, label_test_4class)
+decision_tree(A, v, A_test, v4, label_test, label_test_4class)
+svm_linear(A, v, A_test, v4, label_test, label_test_4class)
+neural_network(A, v, A_test, v4, label_test, label_test_4class)
 
-clf.fit(A, v)
-predicted = clf.predict(A_test)
-print('for 2 class')
-print('precision ', precision_score(label_test, predicted, average='macro'))
-print('recall ', recall_score(label_test, predicted, average='macro'))
+print(pickle.load(open("svm_linear", "rb")))
 
-v = np.array(label_4class)
-clf.fit(A, v)
-predicted = clf.predict(A_test)
-print('for 4 class')
-print('precision ', precision_score(label_test_4class, predicted, average='macro'))
-print('recall ', recall_score(label_test_4class, predicted, average='macro'))
+sum = Question.all_Questions[0].AcceptedAnswerDuration
+for q in Question.all_Questions:
+    print(q.AcceptedAnswerDuration)
+    if q.AcceptedAnswerDuration != -1:
+        sum += q.AcceptedAnswerDuration
+
+print(sum)
