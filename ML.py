@@ -4,7 +4,7 @@ from scipy.sparse import csr_matrix
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
-from datetime import datetime
+from datetime import datetime,timedelta
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import cmudict
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
@@ -347,12 +347,16 @@ decision_tree(A, v, A_test, v4, label_test, label_test_4class)
 svm_linear(A, v, A_test, v4, label_test, label_test_4class)
 neural_network(A, v, A_test, v4, label_test, label_test_4class)
 
-print(pickle.load(open("svm_linear", "rb")))
 
-sum = Question.all_Questions[0].AcceptedAnswerDuration
+accepted_answer_durtion_list=[]
+
 for q in Question.all_Questions:
     print(q.AcceptedAnswerDuration)
     if q.AcceptedAnswerDuration != -1:
-        sum += q.AcceptedAnswerDuration
+        accepted_answer_durtion_list.append(q.AcceptedAnswerDuration)
 
-print(sum)
+average_timedelta = sum(accepted_answer_durtion_list, timedelta(0)) / len(accepted_answer_durtion_list)
+
+print(average_timedelta)
+accepted_answer_durtion_list.sort()
+print(accepted_answer_durtion_list[int(len(accepted_answer_durtion_list)/2)])
