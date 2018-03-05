@@ -4,7 +4,7 @@ from scipy.sparse import csr_matrix
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import cmudict
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
@@ -12,7 +12,7 @@ from sklearn import svm
 from sklearn.neural_network import MLPClassifier
 import pickle
 
-number_of_posts = 100
+number_of_posts = 5000
 print('number of posts ', number_of_posts)
 
 prondict = cmudict.dict()
@@ -36,7 +36,7 @@ def text_statistics(text):
     return word_count, sent_count, syllable_count
 
 
-flesch_formula = lambda word_count, sent_count, syllable_count: 206.835 - 1.015 * word_count / sent_count - 84.6 * syllable_count / word_count
+flesch_formula = lambda word_count, sent_count,syllable_count: 206.835 - 1.015 * word_count / sent_count - 84.6 * syllable_count / word_count
 
 
 def flesch(text):
@@ -44,7 +44,7 @@ def flesch(text):
     return flesch_formula(word_count, sent_count, syllable_count)
 
 
-fk_formula = lambda word_count, sent_count, syllable_count: 0.39 * word_count / sent_count + 11.8 * syllable_count / word_count - 15.59
+fk_formula = lambda word_count, sent_count,syllable_count: 0.39 * word_count / sent_count + 11.8 * syllable_count / word_count - 15.59
 
 
 def flesch_kincaid(text):
@@ -83,6 +83,7 @@ class Question:
         #   self.answered = 1
         if AcceptedAnswerId:
             self.answered = 1
+        self.all_my_answers = []
 
     def set_feature(self):
         self.title_length = len(self.Title)
@@ -94,7 +95,7 @@ class Question:
         #         self.post_length = self.post_length[:index_code] + self.post_length[index_end_code + 7:]
 
         self.readability = flesch(self.Body)
-            # self.post_length = len(self.post_length)
+        # self.post_length = len(self.post_length)
 
         tag_similarity = {}
         for tag in self.Tags:
@@ -113,19 +114,18 @@ class Question:
         for q in Question.all_Questions:
             if q != self and q.CreationDate < self.CreationDate and self.OwnerUserId == q.OwnerUserId:
                 self.question_asked += 1
-
-        for a in Answer.all_Answers:
-            if self.AcceptedAnswerId == a.Id:
-                self.AcceptedAnswerDuration = a.CreationDate - self.CreationDate
-            if a != self and a.CreationDate < self.CreationDate and self.OwnerUserId == a.OwnerUserId:
-                self.question_answered += 1
         self.asker_score = 0
         for u in Karbar.all_Users:
             if u.Id == self.OwnerUserId:
                 self.asker_score = u.asker_score
         self.answer_class = 0
         for a in Answer.all_Answers:
+            if a.ParentId==self.Id:
+                self.all_my_answers.append(a.CreationDate)
+            if a != self and a.CreationDate < self.CreationDate and self.OwnerUserId == a.OwnerUserId:
+                self.question_answered += 1
             if a.Id == self.AcceptedAnswerId:
+                self.AcceptedAnswerDuration = a.CreationDate - self.CreationDate  # not related to others
                 temp = a.CreationDate - self.CreationDate
                 time = temp.total_seconds() / 60
                 if time <= 1440:
@@ -149,8 +149,9 @@ class Question:
 class Answer:
     all_Answers = []
 
-    def __init__(self, Id, CreationDate, OwnerUserId):
+    def __init__(self, Id, ParentId, CreationDate, OwnerUserId):
         self.Id = Id
+        self.ParentId = ParentId
         self.CreationDate = datetime.strptime(CreationDate, '%Y-%m-%d %H:%M:%S')
         self.OwnerUserId = OwnerUserId
 
@@ -283,7 +284,7 @@ with open('QueryResults.csv', 'rt') as file:
                     Question(row[0], row[4], row[6], row[7], row[8], row[9], row[15], row[16], row[17], row[18],
                              row[2]))
             elif PostTypeId == 2:
-                Answer.addAnswer(Answer(row[0], row[4], row[9]))
+                Answer.addAnswer(Answer(row[0], row[3], row[4], row[9]))
 
 with open('QueryResultsUser.csv', 'rt') as file:
     reader = csv.reader(file)
@@ -347,16 +348,23 @@ decision_tree(A, v, A_test, v4, label_test, label_test_4class)
 svm_linear(A, v, A_test, v4, label_test, label_test_4class)
 neural_network(A, v, A_test, v4, label_test, label_test_4class)
 
-
-accepted_answer_durtion_list=[]
-
+accepted_answer_durtion_list = []
+first_answer_duration_list=[]
 for q in Question.all_Questions:
-    print(q.AcceptedAnswerDuration)
+    if len(q.all_my_answers)!=0:
+        first_answer_duration_list.append(min(q.all_my_answers) - q.CreationDate)
     if q.AcceptedAnswerDuration != -1:
         accepted_answer_durtion_list.append(q.AcceptedAnswerDuration)
 
-average_timedelta = sum(accepted_answer_durtion_list, timedelta(0)) / len(accepted_answer_durtion_list)
+average_accepted_answer = sum(accepted_answer_durtion_list, timedelta(0)) / len(accepted_answer_durtion_list)
+average_first_answer = sum(first_answer_duration_list, timedelta(0)) / len(first_answer_duration_list)
 
-print(average_timedelta)
+print(first_answer_duration_list)
+print('mean for accepted',average_accepted_answer)
+print('mean for first',average_first_answer)
+
 accepted_answer_durtion_list.sort()
-print(accepted_answer_durtion_list[int(len(accepted_answer_durtion_list)/2)])
+first_answer_duration_list.sort()
+print('median for accepted',accepted_answer_durtion_list[int(len(accepted_answer_durtion_list) / 2)])
+print('median for first answer', first_answer_duration_list[int(len(first_answer_duration_list) / 2)])
+
